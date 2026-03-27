@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BNB Smart Invest - Pro Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <style>
+        :root { --primary: #f59e0b; --bg: #0f172a; --card-bg: #1e293b; --secondary: #334155; --success: #10b981; }
+        body { background-color: var(--bg); color: white; font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 0; }
+        nav { display: flex; justify-content: space-between; align-items: center; padding: 15px 5%; background-color: var(--card-bg); border-bottom: 2px solid var(--secondary); position: sticky; top: 0; z-index: 1000; }
+        .container { max-width: 1000px; margin: auto; padding: 20px; }
+        .yellow { color: var(--primary); font-weight: bold; }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { background: var(--card-bg); padding: 20px; border-radius: 15px; border: 1px solid var(--secondary); text-align: center; }
+        
+        .accordion-item { background: var(--card-bg); border-radius: 15px; border: 1px solid var(--secondary); margin-bottom: 20px; overflow: hidden; }
+        .accordion-header { background: #1e293b; padding: 15px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--secondary); }
+        .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out; background: #161e2e; }
+        .accordion-content.active { max-height: 800px; overflow-y: auto; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { background: var(--secondary); color: var(--primary); padding: 12px; font-size: 0.9em; text-align: center; }
+        td { padding: 12px; border-bottom: 1px solid var(--secondary); font-family: 'Courier New', Courier, monospace; text-align: center; vertical-align: middle; }
+        
+        .btn { cursor: pointer; border: none; border-radius: 10px; font-weight: bold; padding: 12px; transition: 0.3s; width: 100%; }
+        .btn-connect { background: var(--success); color: white; width: auto; padding: 8px 20px; }
+        .btn-withdraw { background: var(--primary); color: white; max-width: 300px; margin: 20px auto; display: block; font-size: 1.1em; }
+        .btn-invest { background: #3b82f6; color: white; margin-top: 10px; }
+        
+        input { width: 85%; padding: 10px; border-radius: 8px; background: var(--bg); color: white; border: 1px solid var(--secondary); text-align: center; margin-bottom: 10px; font-size: 1em; }
+        .ref-box { margin-top: 20px; padding: 20px; border: 1px dashed var(--primary); border-radius: 10px; background: rgba(245, 158, 11, 0.05); text-align: center; }
+        .countdown { color: #fbbf24; font-weight: bold; letter-spacing: 1px; }
+        .ready-text { color: var(--success); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <h2 class="yellow">BNB Smart Invest</h2>
+    <button id="connectBtn" onclick="connect()" class="btn btn-connect">ربط المحفظة</button>
+</nav>
+
+<div class="container">
+    <div class="stats-grid">
+        <div class="card" style="border-color: var(--success);">
+            <p>إجمالي سيولة العقد (ثقة)</p>
+            <h2 id="contractBalance" style="color: var(--success);">0.00 BNB</h2>
+        </div>
+        <div class="card">
+            <p>إجمالي استثماراتك</p>
+            <h2 id="totalInvested" class="yellow">0.00 tBNB</h2>
+        </div>
+        <div class="card">
+            <p>أرباح الفريق الإجمالية</p>
+            <h2 id="rewardBalance">0.00 tBNB</h2>
+        </div>
+    </div>
+
+    <button onclick="withdraw()" class="btn btn-withdraw">سحب الأرباح المتاحة 💰</button>
+
+    <div class="accordion-item">
+        <div class="accordion-header" onclick="toggleAcc('acc-inv')">
+            <h4 class="yellow">📦 تفاصيل استثماراتي والعداد الزمني</h4>
+            <span>▼</span>
+        </div>
+        <div class="accordion-content" id="acc-inv">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 33.33%;">المبلغ+الربح</th>
+                        <th style="width: 33.33%;">الخطة</th>
+                        <th style="width: 33.33%;">الوقت المتبقي</th>
+                    </tr>
+                </thead>
+                <tbody id="depositsContainer">
+                    <tr><td colspan="3">يرجى ربط المحفظة لعرض البيانات</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="accordion-item">
+        <div class="accordion-header" onclick="toggleAcc('acc-team')">
+            <h4 class="yellow">📊 إحصائيات الفريق والعمولات (25 جيل)</h4>
+            <span>▼</span>
+        </div>
+        <div class="accordion-content" id="acc-team">
+            <table>
+                <thead>
+                    <tr>
+                        <th>الجيل</th>
+                        <th>الأعضاء</th>
+                        <th>إجمالي استثماراتهم</th>
+                        <th>عمولتك %</th>
+                    </tr>
+                </thead>
+                <tbody id="teamLevelsBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="ref-box">
+        <h4>🔗 رابط الإحالة الخاص بك</h4>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+            <span id="refLink" class="yellow" style="word-break: break-all; font-size: 0.9em;">اربط المحفظة للحصول على الرابط</span>
+            <button onclick="copyRef()" style="padding: 8px 20px; cursor: pointer; border-radius: 5px; background: var(--secondary); color: white; border: 1px solid var(--primary);">نسخ الرابط</button>
+        </div>
+    </div>
+
+    <h3 class="yellow" style="margin-top: 30px; text-align: center;">ابدأ استثماراً جديداً</h3>
+    <div class="stats-grid" id="plans-container"></div>
+</div>
+
+<script>
+    const CONTRACT_ADDRESS = "0x0484c454168B9c48073b12cE21c0B0A049A43c40";
+    const ABI = [
+        "function invest(address referrer, uint256 plan) external payable",
+        "function withdraw() external",
+        "function users(address) view returns (address, uint256, uint256, uint256, uint256, uint256)",
+        "function deposits(address, uint256) view returns (uint256 amount, uint256 start, uint256 plan, bool withdrawn)",
+        "function plans(uint256) view returns (uint256 duration, uint256 percent)",
+        "function getUserDownlineCount(address, uint256) view returns (uint256)",
+        "function getUserDownlineInvestment(address, uint256) view returns (uint256)"
+    ];
+
+    // النسب المحددة بدقة لـ 25 جيل
+    const refPercents = [20, 10, 5, 2, 2, 2, 1, 1, 1, 1, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.25, 0.25, 0.25, 0.25, 1];
+
+    let provider, signer, contract, userAddress;
+
+    function toggleAcc(id) { document.getElementById(id).classList.toggle('active'); }
+
+    async function connect() {
+        if (window.ethereum) {
+            provider = new ethers.BrowserProvider(window.ethereum);
+            await provider.send("eth_requestAccounts", []);
+            signer = await provider.getSigner();
+            userAddress = await signer.getAddress();
+            contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+            
+            document.getElementById('connectBtn').innerText = userAddress.substring(0,6) + "...";
+            document.getElementById('refLink').innerText = window.location.origin + window.location.pathname + "?ref=" + userAddress;
+            
+            setInterval(updateUI, 1000); // تحديث العداد كل ثانية
+            renderPlans();
+            loadTeamData();
+        }
+    }
+
+    async function updateUI() {
+        if (!contract || !userAddress) return;
+        try {
+            const user = await contract.users(userAddress);
+            const balance = await provider.getBalance(CONTRACT_ADDRESS);
+            
+            document.getElementById('contractBalance').innerText = parseFloat(ethers.formatEther(balance)).toFixed(3) + " BNB";
+            document.getElementById('totalInvested').innerText = parseFloat(ethers.formatEther(user[1])).toFixed(4) + " tBNB";
+            document.getElementById('rewardBalance').innerText = parseFloat(ethers.formatEther(user[2])).toFixed(4) + " tBNB";
+
+            let depHTML = "";
+            for (let i = 0; i < 15; i++) {
+                try {
+                    const dep = await contract.deposits(userAddress, i);
+                    if (dep.amount == 0n) break;
+                    if (dep.withdrawn) continue;
+
+                    const plan = await contract.plans(dep.plan);
+                    const totalProfit = (dep.amount * plan.percent) / 100n;
+                    const totalAmount = ethers.formatEther(dep.amount + totalProfit);
+                    
+                    const finishTime = Number(dep.start) + Number(plan.duration);
+                    const now = Math.floor(Date.now() / 1000);
+                    const diff = finishTime - now;
+
+                    let timerDisplay = "";
+                    if (diff > 0) {
+                        const d = Math.floor(diff / 86400);
+                        const h = Math.floor((diff % 86400) / 3600);
+                        const m = Math.floor((diff % 3600) / 60);
+                        const s = diff % 60;
+                        timerDisplay = `<span class="countdown">${d}d ${h}h ${m}m ${s}s</span>`;
+                    } else {
+                        timerDisplay = `<span class="ready-text">جاهز ✅</span>`;
+                    }
+
+                    depHTML += `
+                    <tr>
+                        <td>${parseFloat(totalAmount).toFixed(4)}</td>
+                        <td>${Number(plan.duration) / 86400} يوم</td>
+                        <td>${timerDisplay}</td>
+                    </tr>`;
+                } catch (e) { break; }
+            }
+            document.getElementById('depositsContainer').innerHTML = depHTML || "<tr><td colspan='3'>لا توجد استثمارات نشطة</td></tr>";
+        } catch (e) { console.error(e); }
+    }
+
+    function renderPlans() {
+        const plans = [
+            {id: 0, days: 1, perc: 0.5, def: 0.01},
+            {id: 1, days: 7, perc: 5, def: 0.05},
+            {id: 2, days: 14, perc: 8, def: 0.1},
+            {id: 3, days: 28, perc: 25, def: 0.5}
+        ];
+        let html = "";
+        plans.forEach(p => {
+            html += `
+            <div class="card">
+                <h4>خطة ${p.days} يوم</h4>
+                <h3 class="yellow">${p.perc}% ربح</h3>
+                <p style="font-size:0.75em; color:#94a3b8;">رسوم الإيداع: 5%</p>
+                <input type="number" id="amt${p.id}" value="${p.def}" step="0.01">
+                <button onclick="invest(${p.id})" class="btn btn-invest">استثمار الآن</button>
+            </div>`;
+        });
+        document.getElementById('plans-container').innerHTML = html;
+    }
+
+    async function loadTeamData() {
+        if (!contract) return;
+        let html = "";
+        for (let i = 0; i < 25; i++) {
+            try {
+                const count = await contract.getUserDownlineCount(userAddress, i);
+                const inv = ethers.formatEther(await contract.getUserDownlineInvestment(userAddress, i));
+                html += `
+                <tr>
+                    <td>الجيل ${i+1}</td>
+                    <td>${count}</td>
+                    <td>${parseFloat(inv).toFixed(3)} BNB</td>
+                    <td class="yellow">${refPercents[i]}%</td>
+                </tr>`;
+            } catch (e) {}
+        }
+        document.getElementById('teamLevelsBody').innerHTML = html;
+    }
+
+    async function invest(pid) {
+        const amount = document.getElementById(`amt${pid}`).value;
+        const ref = new URLSearchParams(window.location.search).get('ref') || "0x0000000000000000000000000000000000000000";
+        try {
+            const tx = await contract.invest(ref, pid, { value: ethers.parseEther(amount) });
+            await tx.wait();
+            alert("تم الاستثمار بنجاح!");
+        } catch (e) { alert("فشلت العملية، تأكد من رصيدك"); }
+    }
+
+    async function withdraw() {
+        try {
+            const tx = await contract.withdraw();
+            await tx.wait();
+            alert("تم سحب الأرباح بنجاح!");
+        } catch (e) { alert("لا توجد أرباح جاهزة للسحب حالياً"); }
+    }
+
+    function copyRef() {
+        const link = document.getElementById('refLink').innerText;
+        navigator.clipboard.writeText(link);
+        alert("تم نسخ رابط الإحالة!");
+    }
+
+    // تهيئة الخطط عند التحميل
+    renderPlans();
+</script>
+
+</body>
+</html>
